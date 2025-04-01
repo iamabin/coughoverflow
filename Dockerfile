@@ -7,7 +7,6 @@ RUN apt-get update && apt-get install -y \
 COPY pyproject.toml poetry.lock README.md ./
 COPY api ./api
 COPY run.py ./
-COPY instance ./instance
 
 
 RUN pip install --upgrade pip && pip install poetry && \
