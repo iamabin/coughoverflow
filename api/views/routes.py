@@ -47,7 +47,7 @@ def health():
 def labs_results(lab_id):
     try:
         if lab_id not in VALID_LAB_IDS:
-            return jsonify({"error": f" '{lab_id}' not in the list."}), 404
+            return jsonify({"error": f" '{lab_id}' not in the list."}), 400
 
         limit = request.args.get('limit', default=100, type=int)
         offset = request.args.get('offset', default=0, type=int)
@@ -109,7 +109,7 @@ def labs_results(lab_id):
 def labs_results_summary(lab_id):
     try:
         if lab_id not in VALID_LAB_IDS:
-            return jsonify({"error": f" '{lab_id}' not in the list."}), 404
+            return jsonify({"error": f" '{lab_id}' not in the list."}), 400
         query = Analysis_dbs.query.filter_by(lab_id=lab_id)
 
         temp_start = request.args.get('start', default=None, type=str)
@@ -139,7 +139,7 @@ def labs_results_summary(lab_id):
         response = {
             "lab_id": lab_id,
             **status_counts,
-            "generated_at": datetime.utcnow().isoformat() + "Z"
+            "generated_at": datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
         }
         return jsonify(response), 200
 
@@ -151,7 +151,7 @@ def labs_results_summary(lab_id):
 @api.route("/labs", methods=["GET"])
 def labs():
     try:
-        return jsonify(list(VALID_LAB_IDS)), 200
+        return jsonify(sorted(VALID_LAB_IDS)), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -262,7 +262,7 @@ def create_analysis():
         return jsonify({"error": "missing_lab_id"}), 400
 
     if lab_id not in VALID_LAB_IDS:
-        return jsonify({"error": "invalid_lab_id"}), 404
+        return jsonify({"error": "invalid_lab_id"}), 400
 
     data = request.get_json()
     if not data or 'image' not in data:
