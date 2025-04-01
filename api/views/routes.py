@@ -47,7 +47,7 @@ def health():
 def labs_results(lab_id):
     try:
         if lab_id not in VALID_LAB_IDS:
-            return jsonify({"error": f" '{lab_id}' not in the list."}), 400
+            return jsonify({"error": f" '{lab_id}' not in the list."}), 404
 
         limit = request.args.get('limit', default=100, type=int)
         offset = request.args.get('offset', default=0, type=int)
@@ -151,7 +151,7 @@ def labs_results_summary(lab_id):
 @api.route("/labs", methods=["GET"])
 def labs():
     try:
-        return jsonify(sorted(VALID_LAB_IDS)), 200
+        return jsonify(list(VALID_LAB_IDS)), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -254,6 +254,8 @@ def create_analysis():
     patient_id = request.args.get('patient_id', default=None, type=str)
     lab_id = request.args.get('lab_id', default=None, type=str)
     urgent = request.args.get('urgent', default=None, type=str)
+    is_urgent = urgent and urgent.lower() == 'true'
+
     if not patient_id:
         return jsonify({"error": "missing_patient_id"}), 400
     if not re.fullmatch(r"\d{11}", patient_id):
@@ -299,7 +301,7 @@ def create_analysis():
         lab_id=lab_id,
         patient_id=patient_id,
         result="pending",
-        urgent=urgent.lower() == 'true',
+        urgent=is_urgent,
         start_at=now,
         updated_at=now,
         image_path=image_path
