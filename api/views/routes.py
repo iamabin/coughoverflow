@@ -304,8 +304,7 @@ def create_analysis():
             capture_output=True,
             text=True
         )
-        print("🧠 overflowengine stdout:", result.stdout)
-        print("❌ overflowengine stderr:", result.stderr)
+
         predicted_result = result.stdout.strip().lower()
         if predicted_result.startswith("covid"):
             predicted_result = "covid"

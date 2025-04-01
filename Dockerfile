@@ -7,14 +7,19 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl \
     pipx \
+    steghide \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pipx install poetry
 
 WORKDIR /app
 
-RUN ARCH="$(dpkg --print-architecture)" && \
-    wget https://github.com/CSSE6400/CoughOverflow-Engine/releases/download/v1.0/overflowengine-${ARCH} -O overflowengine && \
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then \
+        wget https://github.com/CSSE6400/CoughOverflow-Engine/releases/download/v1.0/overflowengine-amd64 -O overflowengine; \
+    else \
+        wget https://github.com/CSSE6400/CoughOverflow-Engine/releases/download/v1.0/overflowengine-arm64 -O overflowengine; \
+    fi && \
     chmod +x overflowengine
 
 COPY pyproject.toml poetry.lock README.md ./
