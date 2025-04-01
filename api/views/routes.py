@@ -305,11 +305,15 @@ def create_analysis():
             text=True
         )
 
-        predicted_result = result.stdout.strip().lower()
-        if predicted_result.startswith("covid"):
+        raw_output = result.stdout.strip().lower()
+        print("Raw overflowengine stdout:", repr(raw_output))
+
+        if "covid" in raw_output:
             predicted_result = "covid"
-        elif predicted_result in {"h5n1", "healthy"}:
-            predicted_result = predicted_result
+        elif "h5n1" in raw_output:
+            predicted_result = "h5n1"
+        elif "healthy" in raw_output:
+            predicted_result = "healthy"
         else:
             predicted_result = "failed"
     except Exception:
