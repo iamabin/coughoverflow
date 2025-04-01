@@ -151,7 +151,9 @@ def labs_results_summary(lab_id):
 @api.route("/labs", methods=["GET"])
 def labs():
     try:
-        return jsonify(list(VALID_LAB_IDS)), 200
+        lab_ids = db.session.query(Analysis_dbs.lab_id).distinct().all()
+        lab_ids = [lab[0] for lab in lab_ids]
+        return jsonify(lab_ids), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
