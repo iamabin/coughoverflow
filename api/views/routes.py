@@ -4,6 +4,7 @@ from api.models.apidbs import Analysis_dbs
 from flask import Blueprint, jsonify, request
 import re
 import base64
+import subprocess
 
 from datetime import datetime
 import iso8601
@@ -109,7 +110,7 @@ def labs_results(lab_id):
 def labs_results_summary(lab_id):
     try:
         if lab_id not in VALID_LAB_IDS:
-            return jsonify({"error": f" '{lab_id}' not in the list."}), 400
+            return jsonify({"error": f" '{lab_id}' not in the list."}), 404
         query = Analysis_dbs.query.filter_by(lab_id=lab_id)
 
         temp_start = request.args.get('start', default=None, type=str)
@@ -287,7 +288,6 @@ def create_analysis():
 
     new_id = str(uuid4())
     now = datetime.now(timezone.utc)
-
     upload_dir = os.path.join(current_app.instance_path, 'uploads')
     os.makedirs(upload_dir, exist_ok=True)
     filename = f"{new_id}.jpg"
@@ -298,11 +298,27 @@ def create_analysis():
     except Exception as e:
         return jsonify({"error": "image_save_failed", "detail": str(e)}), 500
 
+    try:
+        result = subprocess.run(
+            [os.path.join(current_app.root_path, 'overflowengine'), image_path],
+            capture_output=True,
+            text=True
+        )
+        predicted_result = result.stdout.strip().lower()
+        if predicted_result.startswith("covid"):
+            predicted_result = "covid"
+        elif predicted_result in {"h5n1", "healthy"}:
+            predicted_result = predicted_result
+        else:
+            predicted_result = "failed"
+    except Exception:
+        predicted_result = "failed"
+
     analysis = Analysis_dbs(
         request_id=new_id,
         lab_id=lab_id,
         patient_id=patient_id,
-        result="pending",
+        result=predicted_result,
         urgent=is_urgent,
         start_at=now,
         updated_at=now,
@@ -315,7 +331,7 @@ def create_analysis():
         "id": new_id,
         "created_at": now.isoformat(),
         "updated_at": now.isoformat(),
-        "status": "pending"
+        "status": predicted_result
     }), 201
 
 @api.route("/analysis", methods=["PUT"])
