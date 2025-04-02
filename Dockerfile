@@ -1,12 +1,10 @@
 FROM ubuntu:24.04
 
 RUN apt-get update && apt-get install -y \
-    python3.12 \
-    python3-pip \
-    build-essential \
+    pipx \
     wget \
     curl \
-    pipx \
+    build-essential \
     steghide \
     && rm -rf /var/lib/apt/lists/*
 
@@ -26,10 +24,8 @@ COPY pyproject.toml poetry.lock README.md ./
 COPY api ./api
 COPY run.py ./
 
-ENV POETRY_VIRTUALENVS_CREATE=true
-ENV POETRY_VIRTUALENVS_IN_PROJECT=true
-
 RUN pipx run poetry install --no-root
 
 EXPOSE 8080
-CMD ["/app/.venv/bin/python", "run.py"]
+
+CMD ["pipx", "run", "poetry", "run", "python", "run.py"]
