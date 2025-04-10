@@ -167,8 +167,8 @@ resource "aws_lb_target_group" "coughoverflow" {
     protocol            = "HTTP"
     healthy_threshold   = 2
     unhealthy_threshold = 2
-    timeout             = 10
-    interval            = 30
+    timeout             = 5
+    interval            = 10
   }
 }
 
@@ -248,12 +248,10 @@ resource "aws_ecs_service" "coughoverflow" {
 resource "local_file" "api_txt" {
   content  = "http://${aws_lb.coughoverflow.dns_name}"
   filename = "./api.txt"
-  depends_on = [aws_ecs_service.coughoverflow]
 
 }
 
 output "api_url" {
   value = "http://${aws_lb.coughoverflow.dns_name}"
-  depends_on = [aws_ecs_service.coughoverflow]
 
 }
