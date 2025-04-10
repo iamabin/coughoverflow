@@ -254,4 +254,6 @@ resource "local_file" "api_txt" {
 
 output "api_url" {
   value = "http://${aws_lb.coughoverflow.dns_name}"
+  depends_on = [aws_ecs_service.coughoverflow]
+
 }
