@@ -246,8 +246,8 @@ resource "aws_ecs_service" "coughoverflow" {
 }
 
 resource "local_file" "api_txt" {
-  content  = "http://${aws_lb.coughoverflow.dns_name}"
-  filename = "api.txt"
+  content  = "http://${aws_lb.coughoverflow.dns_name}/"
+  filename = "./api.txt"
 }
 
 output "api_url" {
