@@ -4,6 +4,7 @@ from api.models.apidbs import Analysis_dbs
 from flask import Blueprint, jsonify, request
 import re
 import base64
+import subprocess
 
 from datetime import datetime
 import iso8601
@@ -139,7 +140,7 @@ def labs_results_summary(lab_id):
         response = {
             "lab_id": lab_id,
             **status_counts,
-            "generated_at": datetime.utcnow().isoformat() + "Z"
+            "generated_at": datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
         }
         return jsonify(response), 200
 
@@ -151,7 +152,9 @@ def labs_results_summary(lab_id):
 @api.route("/labs", methods=["GET"])
 def labs():
     try:
-        return jsonify(list(VALID_LAB_IDS)), 200
+        lab_ids = db.session.query(Analysis_dbs.lab_id).distinct().all()
+        lab_ids = [lab[0] for lab in lab_ids]
+        return jsonify(lab_ids), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -254,6 +257,8 @@ def create_analysis():
     patient_id = request.args.get('patient_id', default=None, type=str)
     lab_id = request.args.get('lab_id', default=None, type=str)
     urgent = request.args.get('urgent', default=None, type=str)
+    is_urgent = urgent and urgent.lower() == 'true'
+
     if not patient_id:
         return jsonify({"error": "missing_patient_id"}), 400
     if not re.fullmatch(r"\d{11}", patient_id):
@@ -262,7 +267,7 @@ def create_analysis():
         return jsonify({"error": "missing_lab_id"}), 400
 
     if lab_id not in VALID_LAB_IDS:
-        return jsonify({"error": "invalid_lab_id"}), 404
+        return jsonify({"error": "invalid_lab_id"}), 400
 
     data = request.get_json()
     if not data or 'image' not in data:
@@ -283,7 +288,6 @@ def create_analysis():
 
     new_id = str(uuid4())
     now = datetime.now(timezone.utc)
-
     upload_dir = os.path.join(current_app.instance_path, 'uploads')
     os.makedirs(upload_dir, exist_ok=True)
     filename = f"{new_id}.jpg"
@@ -294,12 +298,36 @@ def create_analysis():
     except Exception as e:
         return jsonify({"error": "image_save_failed", "detail": str(e)}), 500
 
+    try:
+        engine_path = os.path.abspath(os.path.join(current_app.root_path, '..', 'overflowengine'))
+        output_path = os.path.join(upload_dir, f"{new_id}_output.txt")
+
+        subprocess.run(
+            [engine_path, "--input", image_path, "--output", output_path],
+            capture_output=True,
+            text=True
+        )
+
+
+        with open(output_path, "r") as f:
+            predicted_result = f.read().strip().lower()
+
+
+        if predicted_result.startswith("covid"):
+            predicted_result = "covid"
+        elif predicted_result in {"h5n1", "healthy"}:
+            predicted_result = predicted_result
+        else:
+            predicted_result = "failed"
+    except Exception :
+        predicted_result = "failed"
+
     analysis = Analysis_dbs(
         request_id=new_id,
         lab_id=lab_id,
         patient_id=patient_id,
-        result="pending",
-        urgent=urgent.lower() == 'true',
+        result=predicted_result,
+        urgent=is_urgent,
         start_at=now,
         updated_at=now,
         image_path=image_path
@@ -311,7 +339,7 @@ def create_analysis():
         "id": new_id,
         "created_at": now.isoformat(),
         "updated_at": now.isoformat(),
-        "status": "pending"
+        "status": predicted_result
     }), 201
 
 @api.route("/analysis", methods=["PUT"])
