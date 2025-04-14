@@ -245,13 +245,14 @@ resource "aws_ecs_service" "coughoverflow" {
   depends_on = [aws_lb_listener.coughoverflow]
 }
 
-resource "local_file" "api_txt" {
-  content  = "http://${aws_lb.coughoverflow.dns_name}"
-  filename = "./api.txt"
 
+
+resource "local_file" "api_txt" {
+  content  = "http://${aws_lb.coughoverflow.dns_name}/api/v1"
+  filename = "./api.txt"
 }
 
 output "api_url" {
-  value = "http://${aws_lb.coughoverflow.dns_name}"
+  value = "http://${aws_lb.coughoverflow.dns_name}/api/v1"
 
 }
