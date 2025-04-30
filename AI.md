@@ -3,7 +3,7 @@
 I used ChatGPT to help me to provide the debug insight.
 
 - endpoint /analysis post   
-  "Here is the error(cpoyed from the pytest) please tell me how to fix it."  
+  "Here is the error(cpoied from the pytest) please tell me how to fix it."  
    The response is: You should make sure you can get output from overflowengine.
     print("🧠 STDOUT:", repr(result.stdout))
       print("❌ STDERR:", repr(result.stderr))

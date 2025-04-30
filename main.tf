@@ -1,33 +1,3 @@
-# terraform {
-#     required_providers {
-#         aws = {
-#             source  = "hashicorp/aws"
-#             version = "~> 4.0"
-#         }
-#     }
-# }
-#
-# provider "aws" {
-#     region = "us-east-1"
-#     shared_credentials_files = ["./credentials"]
-#     default_tags {
-#         tags = {
-#             Course       = "CSSE6400"
-#             Name         = "CoughOverflow"
-#             Automation   = "Terraform"
-#         }
-#     }
-# }
-#
-# resource "local_file" "url" {
-#     content  = "http://my-url/"  # Replace this string with a URL from your Terraform.
-#     filename = "./api.txt"
-# }
-
-
-
-
-
 
 
 
@@ -144,6 +114,49 @@ resource "aws_security_group" "coughoverflow" {
   }
 }
 
+
+resource "aws_security_group" "rds_sg" {
+  name        = "rds-security-group"
+  description = "Allow ECS services to access RDS"
+  vpc_id      = data.aws_vpc.default.id
+
+  ingress {
+    description = "PostgreSQL from ECS"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_db_instance" "coughoverflow_db" {
+  identifier             = "coughoverflow-db"
+  allocated_storage      = 20
+  engine                 = "postgres"
+  engine_version         = "17.2"
+  instance_class         = "db.t3.micro"
+  name                   = "coughoverflow"
+  username               = "coughuser"
+  password               = "Adminpassword123"
+  publicly_accessible    = true
+  skip_final_snapshot    = true
+  vpc_security_group_ids = [aws_security_group.rds_sg.id]
+  db_subnet_group_name   = aws_db_subnet_group.default.name
+}
+
+resource "aws_db_subnet_group" "default" {
+  name       = "default-db-subnet-group"
+  subnet_ids = data.aws_subnets.default.ids
+}
+
+
 resource "aws_lb" "coughoverflow" {
   name               = "coughoverflow-alb"
   internal           = false
@@ -217,7 +230,13 @@ resource "aws_ecs_task_definition" "coughoverflow" {
           "awslogs-stream-prefix": "ecs",
           "awslogs-create-group": "true"
         }
-      }
+      },
+      "environment": [
+        {
+          "name": "SQLALCHEMY_DATABASE_URI",
+          "value": "postgresql://coughuser:Adminpassword123@${aws_db_instance.coughoverflow_db.address}:5432/coughoverflow"
+        }
+      ]
     }
   ]
   DEFINITION
@@ -247,6 +266,34 @@ resource "aws_ecs_service" "coughoverflow" {
 
 
 
+
+resource "aws_appautoscaling_target" "coughoverflow" {
+  max_capacity       = 15
+  min_capacity       = 1
+  resource_id        = "service/${aws_ecs_cluster.coughoverflow.name}/${aws_ecs_service.coughoverflow.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+resource "aws_appautoscaling_policy" "cpu_policy" {
+  name               = "coughoverflow-cpu"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.coughoverflow.resource_id
+  scalable_dimension = aws_appautoscaling_target.coughoverflow.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.coughoverflow.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+    target_value       = 20.0
+  }
+}
+
+
+
+
+
 resource "local_file" "api_txt" {
   content  = "http://${aws_lb.coughoverflow.dns_name}/api/v1"
   filename = "./api.txt"
@@ -255,4 +302,7 @@ resource "local_file" "api_txt" {
 output "api_url" {
   value = "http://${aws_lb.coughoverflow.dns_name}/api/v1"
 
+}
+output "rds_endpoint" {
+  value = aws_db_instance.coughoverflow_db.endpoint
 }
