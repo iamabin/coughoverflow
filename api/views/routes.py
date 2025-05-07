@@ -13,7 +13,8 @@ from datetime import datetime, timezone
 from uuid import uuid4
 import os
 from flask import current_app
-
+import boto3
+import json
 
 ## TODO: return error without leakage of sensitive information
 api = Blueprint('api', __name__, url_prefix='/api/v1')
@@ -33,7 +34,8 @@ VALID_LAB_IDS = {
     "QML48251", "QML48601", "QML48771", "QML48791", "SNP40011", "SNP40651",
     "SNP43051", "SNP45701"
 }
-
+sqs = boto3.client("sqs", region_name=os.getenv("AWS_REGION", "us-east-1"))
+QUEUE_URL = os.environ["SQS_QUEUE_URL"]
 
 @api.route('/health')
 def health():
@@ -286,60 +288,39 @@ def create_analysis():
 
         }), 400
 
-    new_id = str(uuid4())
+    request_id = str(uuid4())
     now = datetime.now(timezone.utc)
-    upload_dir = os.path.join(current_app.instance_path, 'uploads')
-    os.makedirs(upload_dir, exist_ok=True)
-    filename = f"{new_id}.jpg"
-    image_path = os.path.join(upload_dir, filename)
-    try:
-        with open(image_path, 'wb') as f:
-            f.write(image_data)
-    except Exception as e:
-        return jsonify({"error": "image_save_failed", "detail": str(e)}), 500
 
-    try:
-        engine_path = os.path.abspath(os.path.join(current_app.root_path, '..', 'overflowengine'))
-        output_path = os.path.join(upload_dir, f"{new_id}_output.txt")
-
-        subprocess.run(
-            [engine_path, "--input", image_path, "--output", output_path],
-            capture_output=True,
-            text=True
-        )
-
-
-        with open(output_path, "r") as f:
-            predicted_result = f.read().strip().lower()
-
-
-        if predicted_result.startswith("covid"):
-            predicted_result = "covid"
-        elif predicted_result in {"h5n1", "healthy"}:
-            predicted_result = predicted_result
-        else:
-            predicted_result = "failed"
-    except Exception :
-        predicted_result = "failed"
-
-    analysis = Analysis_dbs(
-        request_id=new_id,
+    new_analysis = Analysis_dbs(
+        request_id=request_id,
         lab_id=lab_id,
         patient_id=patient_id,
-        result=predicted_result,
         urgent=is_urgent,
+        result="pending",
         start_at=now,
         updated_at=now,
-        image_path=image_path
+        image_path=""
     )
-    db.session.add(analysis)
+    db.session.add(new_analysis)
     db.session.commit()
 
+    message = {
+        "request_id": request_id,
+        "image_base64": data["image"],
+        "lab_id": lab_id,
+        "patient_id": patient_id,
+    }
+
+    try:
+        sqs.send_message(QueueUrl=QUEUE_URL, MessageBody=json.dumps(message))
+    except Exception as e:
+        return jsonify({"error": "sqs_send_failed", "detail": str(e)}), 500
+
     return jsonify({
-        "id": new_id,
+        "id": request_id,
         "created_at": now.isoformat(),
         "updated_at": now.isoformat(),
-        "status": predicted_result
+        "status": "pending"
     }), 201
 
 @api.route("/analysis", methods=["PUT"])
