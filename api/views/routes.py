@@ -320,7 +320,7 @@ def create_analysis():
         "id": request_id,
         "created_at": now.isoformat(),
         "updated_at": now.isoformat(),
-        "status": "pending"
+        "result": "pending"
     }), 201
 
 @api.route("/analysis", methods=["PUT"])
