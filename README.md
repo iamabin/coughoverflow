@@ -47,7 +47,7 @@ Clone the repo and run a single script to set up the entire infrastructure on AW
 
 
 ```
-git clone https://github.com/your-username/coughoverflow.git
+git clone https://github.com/iamabin/coughoverflow.git
 cd coughoverflow
 ./deploy.sh
 ```
